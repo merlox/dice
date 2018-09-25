@@ -1,14 +1,7 @@
 let Contract
 let contractInstance
-let contractAddress
 
 function start() {
-    window.addEventListener('load', () => {
-        // Here we can access web3 since metamask has injected it into the page
-        // Abi is available because we imported it before the index.js file in the html
-        Contract = web3.eth.contract(abi)
-    })
-
     document.querySelector('#new-game').addEventListener('click', () => {
         const classNewGameBox = document.querySelector('.new-game-setup').className
 
@@ -46,7 +39,7 @@ function start() {
     document.querySelector('#button-continue').addEventListener('click', () => {
         const valueSelected = document.querySelector('#eth-value').value
         const addressSelected = document.querySelector('#eth-address').value.trim()
-        contractAddress = addressSelected
+        Contract = web3.eth.contract(abi)
 
         if(addressSelected.length === 0) {
             contractInstance = Contract.new({
@@ -54,8 +47,6 @@ function start() {
                 data: bytecode.object,
                 gas: 7e6
             }, (err, result) => {
-                console.log(err, result)
-
                 // This callback will be called twice, the second time includes the contract address
                 if(!result.address) {
                     document.querySelector('#display-address').innerHTML = 'The transaction is being processed, wait until the block is mined to see the address here...'
@@ -67,12 +58,13 @@ function start() {
             let interval
             contractInstance = Contract.at(addressSelected)
             contractInstance.setupPlayer2({
+                value: web3.toWei(valueSelected),
                 gas: 4e6
             }, (err, result) => {
                 interval = setInterval(() => {
                     web3.eth.getTransaction(result, (err, result) => {
                         if(result.blockNumber != null) {
-                            document.querySelector('#display-address').innerHTML = 'App ready'
+                            document.querySelector('#display-address').innerHTML = 'Game ready'
                             clearInterval(interval)
                         }
                     })
