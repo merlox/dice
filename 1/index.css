@@ -1,0 +1,36 @@
+body {
+    font-family: sans-serif;
+}
+
+.main-content {
+    margin: auto;
+    max-width: 500px;
+    background-color: whitesmoke;
+    padding: 50px;
+    border-radius: 10px;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
+    grid-column-gap: 10px;
+}
+
+.main-content h1 {
+    grid-column: 1 / span 2;
+}
+
+.main-content button {
+    border: none;
+    color: white;
+    background-color: #007dff;
+    padding: 20px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.main-content button:hover {
+    opacity: 0.8;
+}
+
+.main-content button:active {
+    opacity: 0.6;
+}
