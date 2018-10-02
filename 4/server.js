@@ -28,8 +28,7 @@ let game = {
     escrowPlayer2: '100000000000000000',
     balancePlayer1: '100000000000000000',
     balancePlayer2: '100000000000000000',
-    sequence1: 0,
-    sequence2: 0
+    sequence: 0
 }
 
 /* Game => {
@@ -42,8 +41,7 @@ let game = {
     escrowPlayer2, -
     balancePlayer1, -
     balancePlayer2, -
-    sequence1, -
-    sequence2, -
+    sequence,
     signedMessage1, -
     signedMessage2, -
     betPlayer1, -
@@ -80,8 +78,7 @@ async function start() {
             game.balancePlayer2 = data.balancePlayer2
             game.addressPlayer2 = data.addressPlayer2
             game.socketPlayer2 = data.socketPlayer2
-            game.sequence1 = 0
-            game.sequence2 = 0
+            game.sequence = 0
 
             console.log('3. Emitting start-game')
             io.emit('start-game')
@@ -112,7 +109,8 @@ async function start() {
             game.betPlayer1 = message.bet
             game.callPlayer1 = message.call
             game.nonce1 = message.nonce
-            game.sequence1 = message.sequence
+            game.sequence = message.sequence
+
 
             // If we have both messages already, distribute the updated game object
             if(game.signedMessage2) {
@@ -121,9 +119,11 @@ async function start() {
                 if(game.callPlayer1 == game.callPlayer2) {
                     game.balancePlayer2 += game.betPlayer2
                     game.balancePlayer1 -= game.betPlayer2
+                    game.winner = 2
                 } else {
                     game.balancePlayer1 += game.betPlayer1
                     game.balancePlayer2 -= game.betPlayer1
+                    game.winner = 1
                 }
 
                 io.emit('received-both-messages', game)
@@ -145,7 +145,7 @@ async function start() {
             game.betPlayer2 = message.bet
             game.callPlayer2 = message.call
             game.nonce2 = message.nonce
-            game.sequence2 = message.sequence
+            game.sequence = message.sequence
 
             // If we have both messages already, distribute the updated game object
             if(game.signedMessage1) {
@@ -157,9 +157,11 @@ async function start() {
                 if(game.callPlayer1 == game.callPlayer2) {
                     game.balancePlayer2 += parseInt(game.betPlayer2)
                     game.balancePlayer1 -= parseInt(game.betPlayer2)
+                    game.winner = 2
                 } else {
                     game.balancePlayer1 += parseInt(game.betPlayer1)
                     game.balancePlayer2 -= parseInt(game.betPlayer1)
+                    game.winner = 1
                 }
 
                 io.emit('received-both-messages', game)

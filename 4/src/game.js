@@ -37,17 +37,7 @@ function setListeners() {
         else isThisPlayer2 = true
 
         // Show some game information
-        document.querySelector('.game-info').innerHTML = `
-            Contract: <b>${gameData.contractAddress}</b> <br/>
-            You are: <b>${(isThisPlayer1) ? 'player 1' : 'player 2'}</b> <br/>
-            Address player 1: <b>${game.addressPlayer1}</b> <br/>
-            Address player 2: <b>${game.addressPlayer2}</b> <br/>
-            Balance player 1: <b>${web3.fromWei(gameData.balancePlayer1)} ether</b> <br/>
-            Balance player 2: <b>${web3.fromWei(gameData.balancePlayer2)} ether</b> <br/>
-            Escrow player 1: <b>${web3.fromWei(gameData.escrowPlayer1)} ether</b> <br/>
-            Escrow player 2: <b>${web3.fromWei(gameData.escrowPlayer2)} ether</b> <br/>
-            Current game: <b>${gameData.sequence1}</b>
-        `
+        updateVisualData(gameData)
     })
 
     socket.on('error', message => {
@@ -56,6 +46,12 @@ function setListeners() {
 
     socket.on('received-both-messages', gameData => {
         game = gameData
+        updateVisualData(gameData)
+
+        if(isThisPlayer1 && gameData.winner == 1)
+            status(`You win ${web3.fromWei(gameData.betPlayer1)} ether! The balances has been updated`)
+        else if(isThisPlayer2 && gameData.winner == 2)
+            status(`You win ${web3.fromWei(gameData.betPlayer2)} ether! The balances has been updated`)
     })
 
     document.querySelectorAll('.dice-image').forEach(dice => {
@@ -103,6 +99,9 @@ function getGameEscrow() {
 
 // This function takes care of generating the messages with the 'activeDice' and the bet used
 async function placeBet(bet) {
+    if(parseInt(bet) > parseInt(getGameBalance())) return status("You can't bet more than your current balance")
+    if(parseInt(bet) > parseInt(getGameEscrow())) return status("You can't bet more than your escrow")
+
     const nonce = Math.floor(Math.random() * 1e16)
     const hash = generateHash(nonce, activeDice, bet, getGameBalance(), sequence)
     const signedMessage = await signMessage(hash)
@@ -140,4 +139,18 @@ function signMessage(hash) {
 			resolve(result)
 		})
 	})
+}
+
+function updateVisualData(gameData) {
+    document.querySelector('.game-info').innerHTML = `
+        Contract: <b>${gameData.contractAddress}</b> <br/>
+        You are: <b>${(isThisPlayer1) ? 'player 1' : 'player 2'}</b> <br/>
+        Address player 1: <b>${game.addressPlayer1}</b> <br/>
+        Address player 2: <b>${game.addressPlayer2}</b> <br/>
+        Balance player 1: <b>${web3.fromWei(gameData.balancePlayer1)} ether</b> <br/>
+        Balance player 2: <b>${web3.fromWei(gameData.balancePlayer2)} ether</b> <br/>
+        Escrow player 1: <b>${web3.fromWei(gameData.escrowPlayer1)} ether</b> <br/>
+        Escrow player 2: <b>${web3.fromWei(gameData.escrowPlayer2)} ether</b> <br/>
+        Current game: <b>${gameData.sequence}</b>
+    `
 }
