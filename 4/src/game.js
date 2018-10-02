@@ -1,24 +1,63 @@
 let activeDice = 0
-let game
-let socket
+let game = {}
 let isThisPlayer1 = false
 let isThisPlayer2 = false
-let sequence
+let sequence = 1
 
 start()
 
 // In the start we get the initial data needed to get the contract address
-function start() {
-    socket = io()
-    setListeners()
+async function start() {
+    window.addEventListener('load', () => {
+        socket = io()
 
-    let game = JSON.parse(localStorage.getItem('game'))
-    isThisPlayer1 = game.isPlayer1
-    isThisPlayer2 = game.isPlayer2
-    socket.emit('get-players-data', game.contractAddress)
+        setListeners()
+    })
 }
 
+// 1. Connect, send socketid and address to server
+// 2. Server responds with the game Data
+// 3. When both are connected, server sends player addresses
 function setListeners() {
+    socket.on('connect', () => {
+        console.log('Socket id connected to server', socket.id)
+
+        // Because we reloaded the page when redirecting, we need to update the socket id of all addresses
+        socket.emit('setup-game', {
+            socket: socket.id,
+            address: web3.eth.defaultAccount
+        })
+    })
+
+    socket.on('initial-game-data', gameData => {
+        game = gameData
+
+        // Who's this?
+        if(game.addressPlayer1 == web3.eth.defaultAccount) isThisPlayer1 = true
+        else isThisPlayer2 = true
+
+        // Show some game information
+        document.querySelector('.game-info').innerHTML = `
+            Contract: <b>${gameData.contractAddress}</b> <br/>
+            You are: <b>${(isThisPlayer1) ? 'player 1' : 'player 2'}</b> <br/>
+            Address player 1: <b>${game.addressPlayer1}</b> <br/>
+            Address player 2: <b>${game.addressPlayer2}</b> <br/>
+            Balance player 1: <b>${web3.fromWei(gameData.balancePlayer1)} ether</b> <br/>
+            Balance player 2: <b>${web3.fromWei(gameData.balancePlayer2)} ether</b> <br/>
+            Escrow player 1: <b>${web3.fromWei(gameData.escrowPlayer1)} ether</b> <br/>
+            Escrow player 2: <b>${web3.fromWei(gameData.escrowPlayer2)} ether</b> <br/>
+            Current game: <b>${gameData.sequence1}</b>
+        `
+    })
+
+    socket.on('error', message => {
+        status(message)
+    })
+
+    socket.on('received-both-messages', gameData => {
+        game = gameData
+    })
+
     document.querySelectorAll('.dice-image').forEach(dice => {
         dice.addEventListener('click', e => {
             // Set the active dice data
@@ -41,28 +80,7 @@ function setListeners() {
         if(bet > getGameBalance()) return status("You can't bet higher than your current balance of " + web3.fromWei(getGameBalance()) + ' ether')
         if(bet > getGameEscrow()) return status("You can't bet higher than your escrow of " + web3.fromWei(getGameEscrow()) + ' ether')
 
-        placeBet(bet)
-    })
-
-    socket.on('game-data', gameData => {
-        game = gameData
-        sequence = gameData.sequence
-
-        // Show some game information
-        document.querySelector('.game-info').innerHTML = `
-            Contract: <b>${gameData.contractAddress}</b> <br/>
-            You are: <b>${(isThisPlayer1) ? 'player 1' : 'player 2'}</b> <br/>
-            Balance player 1: <b>${gameData.balancePlayer1}</b> <br/>
-            Balance player 2: <b>${gameData.balancePlayer2}</b> <br/>
-            Escrow player 1: <b>${gameData.escrowPlayer1}</b> <br/>
-            Escrow player 2: <b>${gameData.escrowPlayer2}</b> <br/>
-            Current game: <b>${gameData.sequence + 1}</b>
-        `
-    })
-
-    // TODO verify this is working
-    socket.on('player-messgae', messageData => {
-        verifyMessage(messageData.signedMessage, messageData.nonce, messageData.call, messageData.bet, messageData.balance, messageData.sequence)
+        placeBet(web3.toWei(bet))
     })
 }
 
@@ -83,43 +101,33 @@ function getGameEscrow() {
     else return game.escrowPlayer2
 }
 
-function getOtherPlayersAddress() {
-    if(isThisPlayer1) return game.addressPlayer1
-    else return game.addressPlayer2
-}
-
 // This function takes care of generating the messages with the 'activeDice' and the bet used
 async function placeBet(bet) {
     const nonce = Math.floor(Math.random() * 1e16)
     const hash = generateHash(nonce, activeDice, bet, getGameBalance(), sequence)
     const signedMessage = await signMessage(hash)
-    const data = {
+    let data = {
         signedMessage: signedMessage,
         nonce: nonce,
-        sequence: sequence
+        call: activeDice,
+        bet: bet,
+        sequence: sequence,
+        sender: web3.eth.defaultAccount
     }
 
     if(isThisPlayer1) {
-        data.callPlayer1 = activeDice
-        data.betPlayer1 = bet
-        data.balancePlayer1 = game.balancePlayer1
+        socket.emit('signed-message-player-1', data)
     } else {
-        data.callPlayer2 = activeDice
-        data.betPlayer2 = bet
-        data.balancePlayer2 = game.balancePlayer2
+        socket.emit('signed-message-player-2', data)
     }
 
     sequence++
-
-    console.log('data', data)
-
-    // TODO Continue here with sending the message to the other player to verify it
 }
 
 function generateHash(nonce, call, bet, balance, sequence) {
 	const hash = '0x' + ethereumjs.ABI.soliditySHA3(
 		['uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
-		[nonce, call, bet, balance, sequence]
+		[String(nonce), String(call), String(bet), String(balance), String(sequence)]
 	).toString('hex')
 
 	return hash
@@ -133,24 +141,3 @@ function signMessage(hash) {
 		})
 	})
 }
-
-// Checks that the message given by the player is valid to make sure the information is correct to continue playing and to reveal the results
-function verifyMessage(signedMessage, nonce, call, bet, balance, sequence) {
-	const hash = generateHash(nonce, call, bet, balance, sequence)
-	const message = ethereumjs.ABI.soliditySHA3(
-		['string', 'bytes32'],
-		['\x19Ethereum Signed Message:\n32', hash]
-	)
-	const splitSignature = ethereumjsUtil.fromRpcSig(signedMessage)
-	const publicKey = ethereumjsUtil.ecrecover(message, splitSignature.v, splitSignature.r, splitSignature.s)
-	const signer = ethereumjsUtil.pubToAddress(publicKey).toString('hex')
-	const isMessageValid = (signer.toLowerCase() == ethereumjsUtil.stripHexPrefix(getOtherPlayersAddress()).toLowerCase())
-	return isMessageValid
-}
-
-
-// 1. Place the bet, send the message to the other player
-// 2. He verifies it and sends the other message
-// 3. The remaining player recieves the message, he verifies it and executes a call to the server
-// 4. The server updates the game object and updates both players
-// 5. We need to display the game information like your balance, his balance, your escrow, his escrow, and the current game being played

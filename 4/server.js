@@ -1,10 +1,11 @@
 const express = require('express')
 const bodyParser = require('body-parser')
-const storage = require('node-persist')
 const path = require('path')
 const app = express()
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
+const ethereumjs = require('ethereumjs-abi')
+const ethereumjsUtil = require('ethereumjs-util')
 const port = 4000
 
 app.use(bodyParser.json())
@@ -16,55 +17,204 @@ app.use(express.static(path.join(__dirname, 'src')))
 // 3. Redirect both players to the game.html view
 // 4. Both players exchange messages in order with a sequence
 // 5. The balances get updated whenever both messages are received and checked
+let games = []
+let player1Message = {}
+let player2Message = {}
+let game = {
+    contractAddress: '0x4d7162ed47e1c6a4190d1986e41ddafde5d97864',
+    addressPlayer1: '0x4d63829017cfff84e3119df46b258c02c1287f17',
+    addressPlayer2: '0x5912d3e530201d7b3ff7e140421f03a7cdb386a3',
+    escrowPlayer1: '100000000000000000',
+    escrowPlayer2: '100000000000000000',
+    balancePlayer1: '100000000000000000',
+    balancePlayer2: '100000000000000000',
+    sequence1: 0,
+    sequence2: 0
+}
+
+/* Game => {
+    contractAddress, -
+    addressPlayer1, -
+    addressPlayer2, -
+    socketPlayer1, -
+    socketPlayer2, -
+    escrowPlayer1, -
+    escrowPlayer2, -
+    balancePlayer1, -
+    balancePlayer2, -
+    sequence1, -
+    sequence2, -
+    signedMessage1, -
+    signedMessage2, -
+    betPlayer1, -
+    betPlayer2, -
+    callPlayer1, -
+    callPlayer2, -
+    nonce1, -
+    nonce2 -
+}
+*/
 
 async function start() {
-    await storage.init()
-    // storage.setItem()
-    // await storage.getItem()
-
     io.on('connection', socket => {
-        console.log('User connected')
+        console.log('User connected', socket.id)
 
         socket.on('disconnect', () => {
-            console.log('User disconnected')
+            console.log('User disconnected', socket.id)
         })
 
         socket.on('setup-player-1', data => {
-            console.log('Received setup-player-1')
-            let player1Data = {
+            console.log('1. Received setup-player-1')
+            game = {
                 contractAddress: data.contractAddress,
                 escrowPlayer1: data.escrowPlayer1,
                 balancePlayer1: data.balancePlayer1,
-                isPlayer1: data.isPlayer1
+                addressPlayer1: data.addressPlayer1,
+                socketPlayer1: data.socketPlayer1
             }
-            storage.setItem(`game-${data.contractAddress}`, player1Data)
         })
 
         socket.on('setup-player-2', async data => {
-            console.log('Received setup-player-2')
-            let gameData = await storage.getItem(`game-${data.contractAddress}`)
-            gameData.escrowPlayer2 = data.escrowPlayer2
-            gameData.balancePlayer2 = data.balancePlayer2
-            gameData.isPlayer2 = data.isPlayer2
-            gameData.sequence = 0
+            console.log('2. Received setup-player-2')
+            game.escrowPlayer2 = data.escrowPlayer2
+            game.balancePlayer2 = data.balancePlayer2
+            game.addressPlayer2 = data.addressPlayer2
+            game.socketPlayer2 = data.socketPlayer2
+            game.sequence1 = 0
+            game.sequence2 = 0
 
-            storage.setItem(`game-${data.contractAddress}`, gameData)
-
-            console.log('Emitting start-game')
+            console.log('3. Emitting start-game')
             io.emit('start-game')
         })
 
-        socket.on('get-players-data', async contractAddress => {
-            console.log('Received get-players-data')
-            let gameData = await storage.getItem(`game-${contractAddress}`)
+        socket.on('setup-game', data => {
+            console.log('4. Received setup-game')
+            if(data.address == game.addressPlayer1) {
+                game.socketPlayer1 = data.socket
+            } else {
+                game.socketPlayer2 = data.socket
+            }
 
-            console.log('Emitting game-data')
-            io.emit('game-data', gameData)
+            console.log('5. Emmiting initial game data for both players with the updated sockets')
+            io.emit('initial-game-data', game)
         })
+
+        socket.on('signed-message-player-1', message => {
+            if(message.sender != game.addressPlayer1) {
+                return io.to(game.socketPlayer1).emit('error', 'The received address of the first player is invalid')
+            }
+
+            const isValid = verifyMessage(message.signedMessage, message.nonce, message.call, message.bet, game.balancePlayer1, message.sequence, game.addressPlayer1)
+
+            if(!isValid) return io.to(game.socketPlayer1).emit('error', 'The received message is not valid, generate a new one again')
+
+            game.signedMessage1 = message.signedMessage
+            game.betPlayer1 = message.bet
+            game.callPlayer1 = message.call
+            game.nonce1 = message.nonce
+            game.sequence1 = message.sequence
+
+            // If we have both messages already, distribute the updated game object
+            if(game.signedMessage2) {
+                games.push(game)
+
+                if(game.callPlayer1 == game.callPlayer2) {
+                    game.balancePlayer2 += game.betPlayer2
+                    game.balancePlayer1 -= game.betPlayer2
+                } else {
+                    game.balancePlayer1 += game.betPlayer1
+                    game.balancePlayer2 -= game.betPlayer1
+                }
+
+                io.emit('received-both-messages', game)
+
+                game = resetGame(game)
+            }
+        })
+
+        socket.on('signed-message-player-2', message => {
+            if(message.sender != game.addressPlayer2) {
+                return io.to(game.socketPlayer2).emit('error', 'The received address of the second player is invalid')
+            }
+
+            const isValid = verifyMessage(message.signedMessage, message.nonce, message.call, message.bet, game.balancePlayer2, message.sequence, game.addressPlayer2)
+
+            if(!isValid) return io.to(game.socketPlayer2).emit('error', 'The received message is not valid, generate a new one again')
+
+            game.signedMessage2 = message.signedMessage
+            game.betPlayer2 = message.bet
+            game.callPlayer2 = message.call
+            game.nonce2 = message.nonce
+            game.sequence2 = message.sequence
+
+            // If we have both messages already, distribute the updated game object
+            if(game.signedMessage1) {
+                games.push(game)
+
+                game.balancePlayer2 = parseInt(game.balancePlayer2)
+                game.balancePlayer1 = parseInt(game.balancePlayer1)
+
+                if(game.callPlayer1 == game.callPlayer2) {
+                    game.balancePlayer2 += parseInt(game.betPlayer2)
+                    game.balancePlayer1 -= parseInt(game.betPlayer2)
+                } else {
+                    game.balancePlayer1 += parseInt(game.betPlayer1)
+                    game.balancePlayer2 -= parseInt(game.betPlayer1)
+                }
+
+                io.emit('received-both-messages', game)
+
+                game = resetGame(game)
+            }
+        })
+
     })
 
     http.listen(port, '0.0.0.0')
     console.log(`Listening on localhost:${port}`)
+}
+
+function resetGame(game) {
+    return {
+        addressPlayer1: game.addressPlayer1,
+        addressPlayer2: game.addressPlayer2,
+        balancePlayer1: game.balancePlayer1,
+        balancePlayer2: game.balancePlayer2,
+        socketPlayer1: game.socketPlayer1,
+        socketPlayer2: game.socketPlayer2
+    }
+}
+
+// Checks that the message given by the player is valid to continue playing and to reveal the results
+function verifyMessage(signedMessage, nonce, call, bet, balance, sequence, playerAddress) {
+	const hash = generateHash(nonce, call, bet, balance, sequence)
+	const message = ethereumjs.soliditySHA3(
+		['string', 'bytes32'],
+		['\x19Ethereum Signed Message:\n32', hash]
+	)
+	const splitSignature = ethereumjsUtil.fromRpcSig(signedMessage)
+	const publicKey = ethereumjsUtil.ecrecover(message, splitSignature.v, splitSignature.r, splitSignature.s)
+	const signer = ethereumjsUtil.pubToAddress(publicKey).toString('hex')
+	const isMessageValid = (signer.toLowerCase() == ethereumjsUtil.stripHexPrefix(playerAddress).toLowerCase())
+	return isMessageValid
+}
+
+function generateHash(nonce, call, bet, balance, sequence) {
+	const hash = '0x' + ethereumjs.soliditySHA3(
+		['uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+		[String(nonce), String(call), String(bet), String(balance), String(sequence)]
+	).toString('hex')
+
+	return hash
+}
+
+function signMessage(hash) {
+	return new Promise((resolve, reject) => {
+		web3.personal.sign(hash, web3.eth.defaultAccount, (err, result) => {
+			if(err) return reject(err)
+			resolve(result)
+		})
+	})
 }
 
 start()

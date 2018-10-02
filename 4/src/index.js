@@ -1,12 +1,12 @@
 let Contract
 let game = {
     contractAddress: '',
+    addressPlayer1: '',
+    addressPlayer2: '',
     escrowPlayer1: 0,
     escrowPlayer2: 0,
     balancePlayer1: 0,
-    balancePlayer2: 0,
-    isPlayer1: false,
-    isPlayer2: false
+    balancePlayer2: 0
 }
 let contractInstance
 let socket
@@ -15,6 +15,7 @@ start()
 
 function start() {
     socket = io()
+
     socket.on('start-game', redirectToGame)
 
     document.querySelector('#new-game').addEventListener('click', () => {
@@ -58,10 +59,10 @@ function start() {
 
         // If this is the first player set his escrow and balance
         if(addressSelected.length === 0) {
-            game.isPlayer1 = true
             game.escrowPlayer1 = web3.toWei(valueSelected)
             game.balancePlayer1 = game.escrowPlayer1
             game.addressPlayer1 = web3.eth.defaultAccount
+            game.socketPlayer1 = socket.id
             contractInstance = Contract.new({
                 value: web3.toWei(valueSelected),
                 data: bytecode.object,
@@ -73,7 +74,6 @@ function start() {
                 } else {
                     document.querySelector('#display-address').innerHTML = 'Contract address: ' + result.address + ' waiting for second player'
                     game.contractAddress = result.address
-                    savePlayerDataLocally()
 
                     socket.emit('setup-player-1', game)
                 }
@@ -83,12 +83,12 @@ function start() {
         } else {
             let interval
 
-            game.isPlayer2 = true
             contractInstance = Contract.at(addressSelected)
             game.contractAddress = addressSelected
             game.escrowPlayer2 = web3.toWei(valueSelected)
             game.balancePlayer2 = game.escrowPlayer2
             game.addressPlayer2 = web3.eth.defaultAccount
+            game.socketPlayer2 = socket.id
             contractInstance.setupPlayer2({
                 value: web3.toWei(valueSelected),
                 gas: 4e6
@@ -100,7 +100,6 @@ function start() {
                         if(result.blockNumber != null) {
                             document.querySelector('#display-address').innerHTML = 'Game ready'
                             clearInterval(interval)
-                            savePlayerDataLocally()
 
                             socket.emit('setup-player-2', game)
                         }
@@ -109,11 +108,6 @@ function start() {
             })
         }
     })
-}
-
-// Saves the game data locally so that you can resume it later
-function savePlayerDataLocally() {
-    localStorage.setItem('game', JSON.stringify(game))
 }
 
 // Changes the view to game
