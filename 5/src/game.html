@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="game.css">
+        <title>Dice ethereum game</title>
+    </head>
+    <body>
+        <div class="main-container-game">
+            <h1>Ethereum Dice</h1>
+
+            <div>
+                <div class="status"></div>
+                <div class="game-info"></div>
+                <div>
+                    <p>1. Place your bet</p>
+                    <input type="number" class="bet-input" placeholder="Your bet in ether..."/>
+                </div>
+                <div>
+                    <p>2. Choose your expected result</p>
+                    <img src="imgs/dice1.png" class="dice-image" id="dice1"/>
+                    <img src="imgs/dice2.png" class="dice-image" id="dice2"/>
+                    <img src="imgs/dice3.png" class="dice-image" id="dice3"/>
+                    <img src="imgs/dice4.png" class="dice-image" id="dice4"/>
+                    <img src="imgs/dice5.png" class="dice-image" id="dice5"/>
+                    <img src="imgs/dice6.png" class="dice-image" id="dice6"/>
+                </div>
+                <button class="place-bet">Place Bet</button>
+                <button class="finish">Finish Game</button>
+            </div>
+        </div>
+
+        <script src="ethereumjs.js"></script>
+        <script src="ethereumjs-util.js"></script>
+        <script src="socket.io.js"></script>
+        <script src="contractData.js"></script>
+        <script src="game.js"></script>
+    </body>
+</html>
