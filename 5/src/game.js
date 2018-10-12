@@ -57,8 +57,6 @@ function setListeners() {
     socket.on('finish-2-messages', message => {
         let contract = web3.eth.contract(abi).at(game.contractAddress)
 
-        console.log('finish data', message.signedMessage1, message.callPlayer1, message.betPlayer1, message.balancePlayer1, message.nonce1, message.sequence, message.addressPlayer1)
-
         contract.verifyPlayerBalance(message.signedMessage1, message.callPlayer1, message.betPlayer1, message.balancePlayer1, message.nonce1, message.sequence, message.addressPlayer1, {
             gas: 7e6
         }, (err, result) => {
@@ -70,7 +68,6 @@ function setListeners() {
                 console.log(err, result)
             })
         })
-
     })
 
     document.querySelectorAll('.dice-image').forEach(dice => {
@@ -144,8 +141,6 @@ async function placeBet(bet) {
     } else {
         socket.emit('signed-message-player-2', data)
     }
-
-    console.log('data', data)
 
     sequence++
 }

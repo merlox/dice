@@ -28,7 +28,17 @@ let game = {
     escrowPlayer2: '',
     balancePlayer1: '',
     balancePlayer2: '',
-    sequence: 0
+    sequence: 0,
+    socketPlayer1: '',
+    socketPlayer2: '',
+    signedMessage1: '',
+    signedMessage2: '',
+    betPlayer1: '',
+    betPlayer2: '',
+    callPlayer1: '',
+    callPlayer2: '',
+    nonce1: '',
+    nonce2: ''
 }
 
 /* Game => {
@@ -100,9 +110,7 @@ async function start() {
             if(message.sender != game.addressPlayer1) {
                 return io.to(game.socketPlayer1).emit('error', 'The received address of the first player is invalid')
             }
-
             const isValid = verifyMessage(message.signedMessage, message.nonce, message.call, message.bet, game.balancePlayer1, message.sequence, game.addressPlayer1)
-
             if(!isValid) return io.to(game.socketPlayer1).emit('error', 'The received message is not valid, generate a new one again')
 
             game.signedMessage1 = message.signedMessage
@@ -111,14 +119,13 @@ async function start() {
             game.nonce1 = message.nonce
             game.sequence = message.sequence
 
-
             // If we have both messages already, distribute the updated game object
             if(game.signedMessage2) {
-                games.push(game)
+                let gameCopy = Object.assign({}, game)
+                games.push(gameCopy)
 
                 game.balancePlayer2 = parseInt(game.balancePlayer2)
                 game.balancePlayer1 = parseInt(game.balancePlayer1)
-
                 if(game.callPlayer1 == game.callPlayer2) {
                     game.balancePlayer2 += parseInt(game.betPlayer2)
                     game.balancePlayer1 -= parseInt(game.betPlayer2)
@@ -128,9 +135,7 @@ async function start() {
                     game.balancePlayer2 -= parseInt(game.betPlayer1)
                     game.winner = 1
                 }
-
                 io.emit('received-both-messages', game)
-
                 game = resetGame(game)
             }
         })
@@ -139,9 +144,7 @@ async function start() {
             if(message.sender != game.addressPlayer2) {
                 return io.to(game.socketPlayer2).emit('error', 'The received address of the second player is invalid')
             }
-
             const isValid = verifyMessage(message.signedMessage, message.nonce, message.call, message.bet, game.balancePlayer2, message.sequence, game.addressPlayer2)
-
             if(!isValid) return io.to(game.socketPlayer2).emit('error', 'The received message is not valid, generate a new one again')
 
             game.signedMessage2 = message.signedMessage
@@ -152,11 +155,11 @@ async function start() {
 
             // If we have both messages already, distribute the updated game object
             if(game.signedMessage1) {
-                games.push(game)
+                let gameCopy = Object.assign({}, game)
+                games.push(gameCopy)
 
                 game.balancePlayer2 = parseInt(game.balancePlayer2)
                 game.balancePlayer1 = parseInt(game.balancePlayer1)
-
                 if(game.callPlayer1 == game.callPlayer2) {
                     game.balancePlayer2 += parseInt(game.betPlayer2)
                     game.balancePlayer1 -= parseInt(game.betPlayer2)
@@ -166,9 +169,7 @@ async function start() {
                     game.balancePlayer2 -= parseInt(game.betPlayer1)
                     game.winner = 1
                 }
-
                 io.emit('received-both-messages', game)
-
                 game = resetGame(game)
             }
         })
