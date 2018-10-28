@@ -30,7 +30,7 @@ contract Dice {
         player2Escrow = msg.value;
     }
 
-    /// @notice To verify and save the player balance to distribute it later when the game is completed. The msg.sender is important to decide which balance is being updated
+    /// @notice To verify and save the player balance to distribute it later when the game is completed. The addressOfMessage is important to decide which balance is being updated
     function verifyPlayerBalance(bytes playerMessage, uint256 playerCall, uint256 playerBet, uint256 playerBalance, uint256 playerNonce, uint256 playerSequence, address addressOfMessage) public {
         require(player2 != address(0), '#1 The address of the player is invalid');
         require(playerMessage.length == 65, '#2 The length of the message is invalid');

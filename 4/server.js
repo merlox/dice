@@ -21,13 +21,13 @@ let games = []
 let player1Message = {}
 let player2Message = {}
 let game = {
-    contractAddress: '0x4d7162ed47e1c6a4190d1986e41ddafde5d97864',
-    addressPlayer1: '0x4d63829017cfff84e3119df46b258c02c1287f17',
-    addressPlayer2: '0x5912d3e530201d7b3ff7e140421f03a7cdb386a3',
-    escrowPlayer1: '100000000000000000',
-    escrowPlayer2: '100000000000000000',
-    balancePlayer1: '100000000000000000',
-    balancePlayer2: '100000000000000000',
+    contractAddress: '',
+    addressPlayer1: '',
+    addressPlayer2: '',
+    escrowPlayer1: '',
+    escrowPlayer2: '',
+    balancePlayer1: '',
+    balancePlayer2: '',
     sequence: 0
 }
 
@@ -208,15 +208,6 @@ function generateHash(nonce, call, bet, balance, sequence) {
 	).toString('hex')
 
 	return hash
-}
-
-function signMessage(hash) {
-	return new Promise((resolve, reject) => {
-		web3.personal.sign(hash, web3.eth.defaultAccount, (err, result) => {
-			if(err) return reject(err)
-			resolve(result)
-		})
-	})
 }
 
 start()

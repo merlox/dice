@@ -92,6 +92,11 @@ function getGameBalance() {
     else return game.balancePlayer2
 }
 
+function getOtherGameBalance() {
+    if(isThisPlayer1) return game.balancePlayer2
+    else return game.balancePlayer1
+}
+
 function getGameEscrow() {
     if(isThisPlayer1) return game.escrowPlayer1
     else return game.escrowPlayer2
@@ -100,6 +105,7 @@ function getGameEscrow() {
 // This function takes care of generating the messages with the 'activeDice' and the bet used
 async function placeBet(bet) {
     if(parseInt(bet) > parseInt(getGameBalance())) return status("You can't bet more than your current balance")
+    if(parseInt(bet) > parseInt(getOtherGameBalance())) return status("You can't bet more than your opponent's current balance")
     if(parseInt(bet) > parseInt(getGameEscrow())) return status("You can't bet more than your escrow")
 
     const nonce = Math.floor(Math.random() * 1e16)
