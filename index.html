@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" href="index.css">
+        <title>Dice ethereum game</title>
+    </head>
+    <body>
+        <div class="main-content">
+            <h1>Ethereum Dice</h1>
+            <button id="new-game">Start new game</button>
+            <button id="join-game">Join existing game</button>
+
+            <div class="hidden new-game-setup">
+                <h3>How much escrow will you use in ETH?</h3>
+                <input id="eth-value" type="number" placeholder="2...">
+            </div>
+
+            <div class="hidden join-game-setup">
+                <h3>What's the smart contract address of the existing game?</h3>
+                <input id="eth-address" type="text" placeholder="0x38dfj39...">
+            </div>
+
+            <button id="button-continue" class="hidden">Continue</button>
+            <b id="display-address"></b>
+        </div>
+
+        <script src="socket.io.js"></script>
+        <script src="contractData.js"></script>
+        <script src="index.js"></script>
+    </body>
+</html>
